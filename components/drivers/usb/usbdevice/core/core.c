@@ -669,6 +669,8 @@ static rt_err_t _vendor_request(udevice_t device, ureq_t setup)
     static rt_uint8_t * usb_comp_id_desc = RT_NULL;
     static rt_uint32_t  usb_comp_id_desc_size = 0;
     usb_os_func_comp_id_desc_t func_comp_id_desc;
+    uintf_t intf;
+    ufunction_t func;
     switch(setup->bRequest)
     {
         case 'A':
@@ -704,6 +706,13 @@ static rt_err_t _vendor_request(udevice_t device, ureq_t setup)
                 }
                 rt_usbd_ep0_write(device, (void*)usb_comp_id_desc, setup->wLength);
             break;
+            case 0x05:
+                intf = rt_usbd_find_interface(device, setup->wValue & 0xFF, &func);
+                if(intf != RT_NULL)
+                {
+                    intf->handler(func, setup);
+                }
+                break;
         }
             
         break;
@@ -831,6 +840,10 @@ static rt_err_t _data_notify(udevice_t device, struct ep_msg* ep_msg)
         {
             EP_HANDLER(ep, func, ep->request.size);
         }
+        else
+        {
+            dcd_ep_read_prepare(device->dcd, EP_ADDRESS(ep), ep->request.buffer, ep->request.remain_size > EP_MAXPACKET(ep) ? EP_MAXPACKET(ep) : ep->request.remain_size);
+        }
     }
 
     return RT_EOK;
@@ -870,6 +883,10 @@ static rt_err_t _ep0_out_notify(udevice_t device, struct ep_msg* ep_msg)
         {
             ep0->rx_indicate(device, size);
         }        
+    }
+    else
+    {
+        rt_usbd_ep0_read(device, ep0->request.buffer, ep0->request.remain_size,ep0->rx_indicate);
     }
 
     return RT_EOK;
@@ -960,7 +977,7 @@ static rt_size_t rt_usbd_ep_read_prepare(udevice_t device, uep_t ep, void *buffe
     RT_ASSERT(buffer != RT_NULL);
     RT_ASSERT(ep->ep_desc != RT_NULL);
 
-    return dcd_ep_read_prepare(device->dcd, EP_ADDRESS(ep), buffer, size);
+    return dcd_ep_read_prepare(device->dcd, EP_ADDRESS(ep), buffer, size > EP_MAXPACKET(ep) ? EP_MAXPACKET(ep) : size);
 }
 
 /**
@@ -2054,18 +2071,26 @@ rt_size_t rt_usbd_ep0_read(udevice_t device, void *buffer, rt_size_t size,
     rt_err_t (*rx_ind)(udevice_t device, rt_size_t size))
 {
     uep_t ep0;
+    rt_size_t read_size = 0;
 
     RT_ASSERT(device != RT_NULL);
     RT_ASSERT(device->dcd != RT_NULL);
     RT_ASSERT(buffer != RT_NULL);
 
     ep0 = &device->dcd->ep0;
-    ep0->request.size = size;
     ep0->request.buffer = buffer;    
     ep0->request.remain_size = size;
     ep0->rx_indicate = rx_ind;
+    if(size >= ep0->id->maxpacket)
+    {
+        read_size = ep0->id->maxpacket;
+    }
+    else
+    {
+        read_size = size;
+    }
     device->dcd->stage = STAGE_DOUT;
-    dcd_ep_read_prepare(device->dcd, EP0_OUT_ADDR, buffer, size);
+    dcd_ep_read_prepare(device->dcd, EP0_OUT_ADDR, buffer, read_size);
 
     return size;
 }

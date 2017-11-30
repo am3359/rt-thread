@@ -132,6 +132,10 @@ menu "Using USB"
                     config _RT_USB_DEVICE_HID
                         bool "Enable to use device as HID device"
                         select RT_USB_DEVICE_HID
+                    config _RT_USB_DEVICE_RNDIS
+                        bool "Enable to use device as rndis device"
+                        select RT_USB_DEVICE_RNDIS
+                        depends on RT_USING_LWIP
                     config _RT_USB_DEVICE_ECM
                         bool "Enable to use device as ecm device"
                         select RT_USB_DEVICE_ECM
@@ -150,6 +154,10 @@ menu "Using USB"
                     config RT_USB_DEVICE_HID
                         bool "Enable to use device as HID device"
                         default n
+                    config RT_USB_DEVICE_RNDIS
+                        bool "Enable to use device as rndis device"
+                        default n
+                        depends on RT_USING_LWIP
                     config RT_USB_DEVICE_ECM
                         bool "Enable to use device as ecm device"
                         default n
@@ -158,7 +166,11 @@ menu "Using USB"
                         bool "Enable to use device as winusb device"
                         default n
                 endif
-
+                if RT_USB_DEVICE_MSTORAGE
+                    config RT_USB_MSTORAGE_DISK_NAME
+                    string "msc class disk name"
+                    default "flash0"
+                endif
                 if RT_USB_DEVICE_HID
                     config RT_USB_DEVICE_HID_KEYBOARD
                         bool "Use to HID device as Keyboard"
